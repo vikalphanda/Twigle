@@ -1,4 +1,11 @@
 Twigle
 ======
 
-A twitter client deployed on Google App Engine.
+A twitter client written in Python and deployed on Google App Engine.
+
+Users can : 
+1. login in using their Twitter account credentials
+2. fetch their tweets and replies on an individual tweet
+3. create and post a new tweet.
+
+For Demo, please visit : http://twigle-gae.appspot.com
