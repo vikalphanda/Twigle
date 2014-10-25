@@ -86,8 +86,11 @@ class Home(webapp2.RequestHandler):
                     <p>We can refresh them while they are valid.</p>
                     <a href="refresh">OK, refresh them!</a>
                     <p>Moreover, we can do powerful stuff with them.</p>
-                    <a href="action/{0}">Show me what you can do!</a>
+                    <a href="post/{0}">Post a tweet</a>
                     """.format(credentials.provider_name))
+                    self.response.write("""<a href="fetch/{0}">Fetch tweets</a>
+                    """.format(credentials.provider_name))
+                   
                 else:
                     self.response.write("""
                     <p>
@@ -95,7 +98,7 @@ class Home(webapp2.RequestHandler):
                     </p>
                     <a href="login/{0}">Refresh</a>
                     """.format(credentials.provider_name))
-
+            #self.response.write('<a href="fetch/{0}">Fetch tweets</a>')
             self.response.write('<p>We can also log you out.</p>')
             self.response.write('<a href="logout">OK, log me out!</a>')
 
@@ -134,7 +137,7 @@ class Refresh(webapp2.RequestHandler):
         self.response.write('<a href="">Try again!</a>')
 
 
-class Action(webapp2.RequestHandler):
+class Post(webapp2.RequestHandler):
     def get(self, provider_name):
         if provider_name == 'tw':
             text = 'tweet'
@@ -147,7 +150,7 @@ class Action(webapp2.RequestHandler):
             <input type="submit" value="Do it!">
         </form>
         """.format(text))
-
+    # To post tweet on user timeline
     def post(self, provider_name):
         self.response.write('<a href="..">Home</a>')
 
@@ -188,6 +191,35 @@ class Action(webapp2.RequestHandler):
             <input type="submit" value="Do it again!">
         </form>
         """)
+            
+
+class Fetch(webapp2.RequestHandler):
+    def get(self,provider_name):
+        if provider_name=='tw':
+            text='tweets'
+        self.response.write("""<a href="..">Home</a>
+        <p>Fetching {0} from your timeline</p>""".format(text))
+
+        serialized_credentials = self.request.cookies.get('credentials')
+        response = authomatic.access(serialized_credentials,
+                   url = 'https://api.twitter.com/1.1/statuses/user_timeline.json',
+                   method='GET')
+        #error = response.data.get('errors')
+        #if error:
+        #    self.response.write('<p>Damn that error: {0}!</p>'.format(error))
+        if response.status == 200:
+            if type(response.data) is list:
+                for tweet in response.data:
+                    text = tweet.get('text')
+                    date = tweet.get('created_at')                                                                        
+                    self.response.write(u'<h3>{}</h3>'.format(text.replace(u'\u2013', '[???]')))
+                    self.response.write(u'Tweeted on: {}'.format(date))
+            #elif response.data.get('errors')
+            #    self.response.write(u'Damn that error: {}!'.format(response.data.get('errors')))
+
+        else:
+            self.response.write('Damn that unknown error!<br />')
+            self.response.write(u'Status: {}'.format(response.status))
 
 
 class Logout(webapp2.RequestHandler):
@@ -204,7 +236,8 @@ class Logout(webapp2.RequestHandler):
 # Create the routes.
 ROUTES = [webapp2.Route(r'/login/<:.*>', Login, handler_method='any'),
           webapp2.Route(r'/refresh', Refresh),
-          webapp2.Route(r'/action/<:.*>', Action),
+          webapp2.Route(r'/post/<:.*>', Post),
+          webapp2.Route(r'/fetch/<:.*>', Fetch),
           webapp2.Route(r'/logout', Logout),
           webapp2.Route(r'/', Home)]
 
