@@ -63,29 +63,17 @@ class Home(webapp2.RequestHandler):
 
                 self.response.write("""
                 <p>
-                    You are logged in with <b>{0}</b> and we have your credentials.
+                    You are logged in with <b>{0}</b>
                 </p>
                 """.format(dict(tw='Twitter')[credentials.provider_name]))
 
-                valid = 'still' if credentials.valid else 'not anymore'
-                expire_soon = 'less' if credentials.expire_soon(60 * 60 * 24) else 'more'
-                remaining = credentials.expire_in
-                expire_on = credentials.expiration_date
-
-                self.response.write("""
-                <p>
-                    They are <b>{0}</b> valid and
-                    will expire in <b>{0}</b> than one day
-                    (in <b>{0}</b> seconds to be precise).
-                    It will be on <b>{0}</b>.
-                </p>
-                """.format(valid, expire_soon, remaining, expire_on))
+                #valid = 'still' if credentials.valid else 'not anymore'
+                #expire_soon = 'less' if credentials.expire_soon(60 * 60 * 24) else 'more'
+                #remaining = credentials.expire_in
+                #expire_on = credentials.expiration_date
 
                 if credentials.valid:
                     self.response.write("""
-                    <p>We can refresh them while they are valid.</p>
-                    <a href="refresh">OK, refresh them!</a>
-                    <p>Moreover, we can do powerful stuff with them.</p>
                     <a href="post/{0}">Post a tweet</a>
                     """.format(credentials.provider_name))
                     self.response.write("""<a href="fetch/{0}">Fetch tweets</a>
@@ -99,43 +87,8 @@ class Home(webapp2.RequestHandler):
                     <a href="login/{0}">Refresh</a>
                     """.format(credentials.provider_name))
             #self.response.write('<a href="fetch/{0}">Fetch tweets</a>')
-            self.response.write('<p>We can also log you out.</p>')
+            #self.response.write('<p>We can also log you out.</p>')
             self.response.write('<a href="logout">OK, log me out!</a>')
-
-
-class Refresh(webapp2.RequestHandler):
-    def get(self):
-        self.response.write('<a href="..">Home</a>')
-
-        serialized_credentials = self.request.cookies.get('credentials')
-        credentials = authomatic.credentials(serialized_credentials)
-        old_expiration = credentials.expiration_date
-
-        response = credentials.refresh(force=True)
-
-        if response:
-            new_expiration = credentials.expiration_date
-
-            if response.status == 200:
-                self.response.write("""
-                <p>
-                    Credentials were refresshed successfully.
-                    Their expiration date was extended from
-                    <b>{0}</b> to <b>{0}</b>.
-                </p>
-                """.format(old_expiration, new_expiration))
-            else:
-                self.response.write("""
-                <p>Refreshment failed!</p>
-                <p>Status code: {0}</p>
-                <p>Error message:</p>
-                <pre>{0}</pre>
-                """.format(response.status, response.content))
-        else:
-            self.response.write('<p>Your credentials don\'t support refreshment!</p>')
-
-        self.response.write('<a href="">Try again!</a>')
-
 
 class Post(webapp2.RequestHandler):
     def get(self, provider_name):
@@ -144,10 +97,10 @@ class Post(webapp2.RequestHandler):
 
         self.response.write("""
         <a href="..">Home</a>
-        <p>We can {0} on your behalf.</p>
+        <p>I want to post a {0}.</p>
         <form method="post">
-            <input type="text" name="message" value="Have you got a bandage?" />
-            <input type="submit" value="Do it!">
+            <input type="text" name="message" value="Twigle is the best Twitter Client :P" />
+            <input type="submit" value="Post it!">
         </form>
         """.format(text))
     # To post tweet on user timeline
@@ -188,7 +141,7 @@ class Post(webapp2.RequestHandler):
         self.response.write("""
         <form method="post">
             <input type="text" name="message" />
-            <input type="submit" value="Do it again!">
+            <input type="submit" value="Post it again!">
         </form>
         """)
             
@@ -221,6 +174,47 @@ class Fetch(webapp2.RequestHandler):
             self.response.write('Damn that unknown error!<br />')
             self.response.write(u'Status: {}'.format(response.status))
 
+# Fetch tweets along with replies
+class Reply(webapp2.RequestHandler):
+    def get(self, provider_name):
+        if provider_name =='tw':
+            text = 'replies'
+        self.response.write("""<a href="..">Home</a>
+        <p>Fetching {0} for your tweets</p>""".format(text))
+        serialized_credentials = self.request.cookies.get('credentials')
+        response = authomatic.access(serialized_credentials,
+                url='https://api.twitter.com/1.1/statuses/user_timeline.json',
+                method='GET')
+        replies = authomatic.access(serialized_credentials,
+                url='https://api.twitter.com/1.1/statuses/mentions_timeline.json',
+                method='GET')
+        if response.status == 200:
+            if type(response.data) is list:
+                for tweet in response.data:
+                    twt_id = tweet.get('id')
+                    text = tweet.get('text')
+                    date = tweet.get('created_at')                                                                        
+                    #self.response.write(u'<br/>Tweet id : {}'.format(twt_id))
+                    is_tweet_reply_id = tweet.get('in_reply_to_status_id')
+                    if is_tweet_reply_id is None:
+                        self.response.write(u'<h3>{}</h3>'.format(text.replace(u'\u2013', '[???]')))
+                        self.response.write(u'Tweeted on: {}'.format(date))
+                    if replies.status == 200:
+                        if type(replies.data) is list:
+                            for reply in replies.data:
+                                reply_to_status_id = reply.get('in_reply_to_status_id')
+                                str_id = reply.get('id_str')
+                                if reply_to_status_id == twt_id:
+                                    reply_text = reply.get('text')
+                                    reply_date = reply.get('created_at')
+                                    self.response.write(u'<h5>{}</h5>'.format(reply_text.replace(u'\u2013', '[???]')))
+                                    self.response.write(u'Replied on: {}'.format(reply_date))
+        else:
+            self.response.write('Damn that unknown error!<br />')
+            self.response.write(u'Status: {}'.format(response.status))
+
+
+
 
 class Logout(webapp2.RequestHandler):
     def get(self):
@@ -235,9 +229,9 @@ class Logout(webapp2.RequestHandler):
 
 # Create the routes.
 ROUTES = [webapp2.Route(r'/login/<:.*>', Login, handler_method='any'),
-          webapp2.Route(r'/refresh', Refresh),
+          #webapp2.Route(r'/refresh', Refresh),
           webapp2.Route(r'/post/<:.*>', Post),
-          webapp2.Route(r'/fetch/<:.*>', Fetch),
+          webapp2.Route(r'/fetch/<:.*>', Reply),
           webapp2.Route(r'/logout', Logout),
           webapp2.Route(r'/', Home)]
 
